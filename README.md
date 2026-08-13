@@ -103,13 +103,41 @@ Receber um conteúdo técnico, processá-lo utilizando um modelo de Machine Lear
 
 ## ⚙️ Back-end (API Java)
 
-A API REST em Java é o ponto de entrada da solução TechMind. Ela recebe as requisições do usuário, valida os dados e orquestra a chamada ao serviço de Ciência de Dados para classificar cada conteúdo técnico. Além de orquestrar a classificação, ela persiste os resultados no Oracle Database e expõe endpoints de busca, categorização e processamento em lote via CSV.
+A API REST em Java é o ponto de entrada da solução TechMind. Ela recebe as requisições do usuário, valida os dados e orquestra a chamada ao serviço de Ciência de Dados para classificar cada conteúdo técnico. Além de orquestrar a classificação, ela persiste os resultados no Oracle Database e expõe endpoints de busca, categorização, recomendação e processamento em lote via CSV.
 
-A aplicação é organizada como um **monólito modular** (Spring Modulith), com os módulos `conteudo`, `infrastructure` e `user`.
+A aplicação é organizada como um **monólito modular** (Spring Modulith), separada em módulos com responsabilidades bem definidas:
+
+```text
+com.g9team04.techmind
+│
+├── conteudo            → Controller, Service e DTOs (API pública do módulo)
+├── conteudo.internal    → Entity, Repository, OciClassifierService, HashUtils (encapsulado)
+├── infrastructure       → Exceções de domínio e GlobalExceptionHandler (compartilhado)
+└── user                 → Cadastro e gestão de usuários (Controller, Service, DTOs)
+```
 
 ### Fluxo de processamento de um conteúdo
 
-1. **Validar** — Bean Validation garante título e texto obrigatórios (`@NotBlank`).
+```text
+Cliente
+  │  HTTP/JSON
+  ▼
+Controller
+  ▼
+Bean Validation (@NotBlank, @Size)
+  ▼
+Service
+  ▼
+Verificação de cache (hash SHA-256)
+  ▼
+ClassifierService → OciClassifierService → Serviço Python (RestClient)
+  ▼
+Persistência (Oracle Database)
+  ▼
+Resposta JSON (201 Created)
+```
+
+1. **Validar** — Bean Validation garante título e texto obrigatórios.
 2. **Verificar cache** — o hash SHA-256 do texto é comparado com hashes já persistidos no banco.
 3. **Classificar** — se não houver cache, o serviço Python é chamado internamente via `RestClient`.
 4. **Persistir** — salva categoria, probabilidade e palavras-chave no Oracle Database.
@@ -117,15 +145,81 @@ A aplicação é organizada como um **monólito modular** (Spring Modulith), com
 
 > O cache por hash evita reclassificar o mesmo texto duas vezes: se o conteúdo já existe (mesmo hash), a resposta anterior é reaproveitada, poupando uma chamada ao serviço de ML.
 
+A classificação é abstraída por uma interface, o que desacopla a regra de negócio da implementação do modelo/OCI:
+
+```java
+public interface ClassifierService {
+    MlPredicaoResponse classificar(String titulo, String texto);
+}
+```
+
 ### Endpoints
 
 | Endpoint | Método | Descrição |
 |---|---|---|
-| `/conteudo` | `POST` | Cria e classifica um novo conteúdo técnico |
-| `/conteudo/titulo` | `GET` | Busca paginada por título |
-| `/conteudo/categoria` | `GET` | Busca paginada por categoria |
-| `/conteudo/relacionados/{id}` | `GET` | Lista conteúdos da mesma categoria |
+| `/conteudo` | `POST` | Cria e classifica um novo conteúdo técnico. Retorna `201 Created` |
+| `/conteudo/titulo` | `GET` | Busca paginada por título (contém, ignora maiúsculas/minúsculas) |
+| `/conteudo/categoria` | `GET` | Busca paginada por categoria. Retorna `404` se a categoria não existir |
+| `/conteudo/relacionados/{id}` | `GET` | Lista conteúdos da mesma categoria, excluindo o próprio ID |
 | `/conteudo/lote` | `POST` | Upload multipart de um CSV para processamento em lote |
+
+### Processamento em lote (CSV)
+
+```text
+MultipartFile → ValidatorCsv (extensão, content-type, máx. 10MB)
+             → InputStream → LoteProcessor (leitura linha a linha)
+             → Particionamento (sucesso / falha)
+             → Classificação de cada linha
+             → LoteResponse consolidado
+```
+
+Se nenhuma linha for processada com sucesso, o lote inteiro é rejeitado (`LoteProcessamentoException`).
+
+**Exemplo de resposta (`LoteResponse`):**
+```json
+{
+  "totalLinhas": 50,
+  "sucessos": 47,
+  "falhas": 3,
+  "idsProcessados": [101, 102],
+  "erros": [
+    {
+      "linha": 12,
+      "titulo": "vazio",
+      "mensagem": "Título ou texto vazio"
+    }
+  ]
+}
+```
+
+### Tratamento de erros
+
+| Código | Quando ocorre |
+|---|---|
+| `400 Bad Request` | Dados inválidos ou arquivo/CSV inválido |
+| `404 Not Found` | Conteúdo ou categoria não encontrados (`ConteudoNaoEncontradoException`) |
+| `503 Service Unavailable` | Falha ao chamar o serviço de classificação Python (`MlClassificacaoException`) |
+| `500 Internal Server Error` | Erro inesperado, capturado por um handler genérico |
+
+O `GlobalExceptionHandler` centraliza todo o tratamento via `@RestControllerAdvice`: cada exceção de domínio carrega seu próprio `HttpStatus`, e a resposta de erro segue um formato único em toda a API.
+
+### Testes automatizados
+
+O projeto possui testes de Controller e Service (ex: `UserControllerTest`, `UserServiceTest`), cobrindo regras de negócio, respostas HTTP e cenários de erro.
+
+### Observabilidade e performance
+
+- **Actuator** expõe `health`, `info`, `prometheus` e `metrics`; **Micrometer + OpenTelemetry** cobrem tracing distribuído.
+- **Virtual Threads** habilitadas (Spring Boot 4.1) para maior throughput em chamadas de I/O, como a comunicação com o serviço Python.
+- Fluxo ponta a ponta testado com o serviço Python, incluindo cache H2 para testes locais de integração.
+
+### Status do serviço Java
+
+- ✅ Definição do escopo e dataset
+- ✅ Modelo treinado e API desenvolvida
+- ✅ Documentação inicial
+- 🔄 Integração com OCI
+- 🔄 Dashboard e deploy final
 
 ---
 
@@ -457,4 +551,3 @@ TechMind/
 ---
 
 ## ⭐ Projeto desenvolvido para o Hackathon Oracle Next Education (ONE) G9 BR.
-
