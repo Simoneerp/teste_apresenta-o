@@ -110,10 +110,10 @@ A aplicação é organizada como um **monólito modular** (Spring Modulith), sep
 ```text
 com.g9team04.techmind
 │
-├── conteudo            → Controller, Service e DTOs (API pública do módulo)
-├── conteudo.internal    → Entity, Repository, OciClassifierService, HashUtils (encapsulado)
-├── infrastructure       → Exceções de domínio e GlobalExceptionHandler (compartilhado)
-└── user                 → Cadastro e gestão de usuários (Controller, Service, DTOs)
+├── conteudo             → Controller, Service e DTOs (API pública do módulo)
+├── conteudo.internal     → Entity, Repository, OciClassifierService, HashUtils (encapsulado)
+├── infrastructure        → Exceções de domínio e GlobalExceptionHandler (compartilhado)
+└── user                  → Cadastro e gestão de usuários (Controller, Service, DTOs)
 ```
 
 ### Fluxo de processamento de um conteúdo
