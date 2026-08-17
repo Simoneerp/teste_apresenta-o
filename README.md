@@ -2,7 +2,7 @@
 
 | Integrante                        | Função                                          | GitHub | LinkedIn |
 | --------------------------------- | ----------------------------------------------- | ------ | -------- |
-| **Arthur Carvalho Ferreira**      | 💻 Back End Developer                           | [GitHub]() | [LinkedIn](https://www.linkedin.com/in/arthur-fernando-carvalho-ferreira-96542772/) |
+| **Arthur Carvalho Ferreira**      | 💻 Back End Developer                           | [GitHub](https://github.com/ArthurFerreira13) | [LinkedIn](https://www.linkedin.com/in/arthur-fernando-carvalho-ferreira-96542772/) |
 | **Carlos Caique Borges de Souza** | 💻 Back End Developer                           |  [GitHub](https://github.com/devcaiqueborges) | [LinkedIn](https://www.linkedin.com/in/devcaiqueborges) |
 | **Gabriel Leal**                  | ☁️ DevOps Engineer                              | [GitHub](LINK) | [LinkedIn](https://www.linkedin.com/in/gabriellincolnleal) |
 | **Jaqueline Silva Broccolo**      | 🔗 Full Stack Developer                         | [GitHub](https://github.com/jlinebsilva ) | [LinkedIn](https://www.linkedin.com/in/jaqueline-silva-broccolo/) |
